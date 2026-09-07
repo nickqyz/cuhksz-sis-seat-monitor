@@ -364,7 +364,7 @@ async function prepareSearch(page, subject) {
   }
   if (expanded) {
     const started = Date.now();
-    while (Date.now() - started < 30000) {
+    while (Date.now() - started < 90000) {
       await delay(500);
       frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']");
       const count = await frame.locator("[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']").count();
