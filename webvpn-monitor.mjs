@@ -382,7 +382,10 @@ async function checkTarget(page, target) {
   const missing = sections.filter(item => item.status === "Not found");
   if (missing.length) {
     const visibleNames = (await frame.locator("[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']").allInnerTexts()).map(text => text.trim()).filter(Boolean);
+    const counters = (await frame.locator(".PSGRIDCOUNTER").allInnerTexts()).map(text => text.trim()).filter(Boolean);
+    const paging = await frame.locator("[id*='hviewall'], [id*='next' i]").evaluateAll(elements => elements.map(element => ({ tag: element.tagName, id: element.id, text: element.textContent?.trim(), title: element.getAttribute("title"), alt: element.getAttribute("alt") })));
     log(`${target.subject} 结果页班级标签：${visibleNames.join(" | ") || "（无）"}`);
+    log(`${target.subject} 网格计数器：${counters.join(" | ") || "（无）"}；分页控件：${JSON.stringify(paging)}`);
     throw new Error(`${target.subject} 未找到目标班级：${missing.map(item => item.token).join("、")}`);
   }
   return { id: target.id, checkedAt: new Date().toISOString(), term: "2026-27 Term 1", course: target.course, sections, allOpen: sections.every(item => item.open) };
