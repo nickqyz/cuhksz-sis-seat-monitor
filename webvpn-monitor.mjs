@@ -337,6 +337,12 @@ async function checkTarget(page, target) {
   const frame = await prepareSearch(page, target.subject);
   const sections = [];
   for (const token of target.sectionTokens) sections.push(await readSection(frame, token));
+  const missing = sections.filter(item => item.status === "Not found");
+  if (missing.length) {
+    const visibleNames = (await frame.locator("[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']").allInnerTexts()).map(text => text.trim()).filter(Boolean);
+    log(`${target.subject} 结果页班级标签：${visibleNames.join(" | ") || "（无）"}`);
+    throw new Error(`${target.subject} 未找到目标班级：${missing.map(item => item.token).join("、")}`);
+  }
   return { id: target.id, checkedAt: new Date().toISOString(), term: "2026-27 Term 1", course: target.course, sections, allOpen: sections.every(item => item.open) };
 }
 
