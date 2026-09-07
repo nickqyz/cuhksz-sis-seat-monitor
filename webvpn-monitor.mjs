@@ -316,8 +316,11 @@ async function runOnce(config) {
   try {
     const page = context.pages()[0] || await context.newPage();
     await portalLogin(page, config);
+    log(`云端阶段：Web VPN 已登录（${await page.title().catch(() => "未知标题")}）`);
     await openSis(page, config);
+    log(`云端阶段：SIS SSO 已处理（${await page.title().catch(() => "未知标题")}）`);
     await enterClassSearch(page);
+    log("云端阶段：已进入 Class Search");
     const result = await check(page);
     await saveDebug(page, result);
     const state = readState();
@@ -330,6 +333,12 @@ async function runOnce(config) {
     }
     writeState({ ...state, lastAllOpen: result.allOpen, lastCheckAt: result.checkedAt, lastResult: result });
     setActionOutput("state_changed", stateChanged ? "true" : "false");
+  } catch (error) {
+    const page = context.pages()[0];
+    const title = await page?.title().catch(() => "未知标题");
+    const url = page?.url()?.replace(/[?#].*$/, "") || "未知地址";
+    log(`云端诊断：页面标题=${title}，地址=${url}`);
+    throw error;
   } finally {
     await context.close().catch(() => {});
   }
