@@ -1,0 +1,18 @@
+{
+  "name": "cuhksz-sis-seat-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only CUHK(SZ) SIS seat monitor with WeChat notifications",
+  "scripts": {
+    "monitor": "powershell -NoProfile -ExecutionPolicy Bypass -File run-monitor.ps1",
+    "test-notify": "powershell -NoProfile -ExecutionPolicy Bypass -File test-notify.ps1",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.55.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

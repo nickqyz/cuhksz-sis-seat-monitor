@@ -1,0 +1,53 @@
+name: SIS seat monitor
+
+on:
+  schedule:
+    - cron: "2/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sis-seat-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Restore notification state
+        id: restore-state
+        uses: actions/cache/restore@v4
+        with:
+          path: .data/state.json
+          key: sis-state-${{ github.run_id }}
+          restore-keys: |
+            sis-state-
+
+      - name: Check seats
+        id: check
+        env:
+          SIS_USERNAME: ${{ secrets.SIS_USERNAME }}
+          SIS_PASSWORD: ${{ secrets.SIS_PASSWORD }}
+          WXPUSHER_SPT: ${{ secrets.WXPUSHER_SPT }}
+          BROWSER_PATH: /usr/bin/google-chrome
+          HEADLESS: "true"
+        run: node webvpn-monitor.mjs once
+
+      - name: Save changed notification state
+        if: steps.check.outputs.state_changed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .data/state.json
+          key: sis-state-${{ github.run_id }}
