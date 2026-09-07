@@ -372,7 +372,14 @@ async function processResults(config, state, results) {
 
 async function checkAll(page) {
   const results = [];
-  for (const target of TARGETS) results.push(await checkTarget(page, target));
+  const classSearchUrl = page.url();
+  for (let index = 0; index < TARGETS.length; index += 1) {
+    if (index > 0) {
+      await page.goto(classSearchUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+      await waitForFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']", 45000);
+    }
+    results.push(await checkTarget(page, TARGETS[index]));
+  }
   return results;
 }
 
