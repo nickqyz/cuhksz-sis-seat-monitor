@@ -222,6 +222,28 @@ async function clickViewAll(frame) {
   return false;
 }
 
+async function waitForSisLanding(page, timeout = 120000) {
+  const started = Date.now();
+  let signInClicks = 0;
+  while (Date.now() - started < timeout) {
+    if (await findFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']")) return;
+    const classSearch = page.locator("a").filter({ hasText: /^Class Search$/ }).last();
+    if (await visible(classSearch, 300)) return;
+    const marker = `${page.url()} ${await page.title().catch(() => "")}`;
+    if (/errorCode=105|\bsign in\b/i.test(marker)) {
+      const signIn = await firstVisibleAcrossFrames(page, "input[value='Sign In'], button:has-text('Sign In'), a:has-text('Sign In')");
+      if (signIn && signInClicks < 2) {
+        await signIn.click();
+        signInClicks += 1;
+        await delay(4000);
+        continue;
+      }
+    }
+    await delay(1000);
+  }
+  throw new Error("SIS 登录后未进入首页或 Class Search");
+}
+
 async function portalLogin(page, config) {
   await page.goto(VPN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
   await delay(1000);
@@ -281,7 +303,7 @@ async function openSis(page, config) {
     await delay(4000);
   }
 
-  if (/errorCode=105/i.test(`${page.url()} ${await page.title().catch(() => "")}`)) throw new Error("SIS SSO 会话冲突（errorCode=105），稍后自动重试");
+  await waitForSisLanding(page);
   if (await visible(english)) throw new Error("SIS 登录未完成");
 }
 
