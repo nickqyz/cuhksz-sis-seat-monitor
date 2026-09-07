@@ -159,6 +159,26 @@ async function waitForFrame(page, selector, timeout = 30000) {
   throw new Error(`等待 SIS 控件超时：${selector}`);
 }
 
+async function waitForPeopleSoftIdle(page, timeout = 60000) {
+  await delay(700);
+  const started = Date.now();
+  let quietPasses = 0;
+  while (Date.now() - started < timeout) {
+    let busy = false;
+    for (const frame of page.frames()) {
+      const indicators = frame.locator("[id^='WAIT_'], [class*='PROCESSING'], [class*='processing']");
+      for (let i = 0; i < await indicators.count().catch(() => 0); i += 1) {
+        if (await visible(indicators.nth(i), 200)) { busy = true; break; }
+      }
+      if (busy) break;
+    }
+    quietPasses = busy ? 0 : quietPasses + 1;
+    if (quietPasses >= 3) return;
+    await delay(500);
+  }
+  throw new Error("PeopleSoft 页面处理超时");
+}
+
 async function portalLogin(page, config) {
   await page.goto(VPN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
   await delay(1000);
@@ -251,18 +271,21 @@ async function prepareSearch(page) {
   const term = frame.locator("[id='CLASS_SRCH_WRK2_STRM$35$']");
   if (await term.inputValue().catch(() => "") !== "2610") {
     await term.selectOption("2610");
-    await delay(2500);
+    await waitForPeopleSoftIdle(page);
     frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']");
   }
 
   await frame.locator("[id='SSR_CLSRCH_WRK_SUBJECT$0']").selectOption("GEA");
-  await delay(2500);
+  await waitForPeopleSoftIdle(page);
   frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_ACAD_CAREER$2']");
   await frame.locator("[id='SSR_CLSRCH_WRK_ACAD_CAREER$2']").selectOption("UG");
+  await waitForPeopleSoftIdle(page);
+  frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_ACAD_CAREER$2']");
   const openOnly = frame.locator("[id='SSR_CLSRCH_WRK_SSR_OPEN_ONLY$3']");
   if (await openOnly.isChecked()) await openOnly.uncheck();
+  log(`查询条件已确认：term=${await frame.locator("[id='CLASS_SRCH_WRK2_STRM$35$']").inputValue()} subject=${await frame.locator("[id='SSR_CLSRCH_WRK_SUBJECT$0']").inputValue()} career=${await frame.locator("[id='SSR_CLSRCH_WRK_ACAD_CAREER$2']").inputValue()} openOnly=${await openOnly.isChecked()}`);
   await frame.locator("[id='CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH']").click();
-  await delay(5000);
+  await waitForPeopleSoftIdle(page, 90000);
 
   frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']", 90000);
   const viewAll = frame.locator("[id='$ICField106$hviewall$0']");
