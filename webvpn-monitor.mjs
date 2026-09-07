@@ -355,8 +355,13 @@ async function prepareSearch(page, subject) {
     expanded = await clickViewAll(frame);
   }
   if (expanded) {
-    await delay(1500);
-    frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']");
+    const started = Date.now();
+    while (Date.now() - started < 30000) {
+      await delay(500);
+      frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']");
+      const count = await frame.locator("[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']").count();
+      if (count > 6) break;
+    }
   }
   return frame;
 }
