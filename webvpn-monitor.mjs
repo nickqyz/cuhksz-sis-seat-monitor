@@ -281,7 +281,7 @@ async function openSis(page, config) {
     await delay(4000);
   }
 
-  if (/errorCode=105/i.test(page.url())) throw new Error("SIS SSO 会话冲突（errorCode=105），稍后自动重试");
+  if (/errorCode=105/i.test(`${page.url()} ${await page.title().catch(() => "")}`)) throw new Error("SIS SSO 会话冲突（errorCode=105），稍后自动重试");
   if (await visible(english)) throw new Error("SIS 登录未完成");
 }
 
