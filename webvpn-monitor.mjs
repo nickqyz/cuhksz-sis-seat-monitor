@@ -212,9 +212,13 @@ async function openSis(page, config) {
     await delay(1500);
   }
 
-  const adfsLogin = /\/adfs\//i.test(page.url()) || /登录|sign[ -]?in/i.test(await page.title().catch(() => ""));
+  const usernameSelector = "#userNameInput, input[name*='user' i], input[type='email'], input[type='text']";
+  let username = await firstVisibleAcrossFrames(page, usernameSelector);
+  const loadingAuth = /adfs|oauth2|loading/i.test(`${page.url()} ${await page.title().catch(() => "")}`);
+  if (!username && loadingAuth) username = await waitForVisibleAcrossFrames(page, usernameSelector, 30000);
+  const adfsLogin = Boolean(username) || /\/adfs\//i.test(page.url()) || /登录|sign[ -]?in/i.test(await page.title().catch(() => ""));
   if (adfsLogin) {
-    const username = await waitForVisibleAcrossFrames(page, "#userNameInput, input[name*='user' i], input[type='email'], input[type='text']");
+    username ||= await waitForVisibleAcrossFrames(page, usernameSelector);
     if (!username) throw new Error("ADFS 登录页未找到账号输入框");
     await username.fill(config.username);
 
