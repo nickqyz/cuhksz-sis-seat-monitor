@@ -183,6 +183,28 @@ async function waitForPeopleSoftIdle(page, timeout = 60000) {
   throw new Error("PeopleSoft 页面处理超时");
 }
 
+async function clickSearchReset(page) {
+  for (const frame of page.frames()) {
+    const controls = frame.locator("input, button, a");
+    for (let index = 0; index < await controls.count(); index += 1) {
+      const control = controls.nth(index);
+      const label = [
+        await control.getAttribute("value").catch(() => ""),
+        await control.getAttribute("aria-label").catch(() => ""),
+        await control.getAttribute("title").catch(() => ""),
+        await control.innerText().catch(() => ""),
+        await control.getAttribute("id").catch(() => "")
+      ].filter(Boolean).join(" ");
+      if (!/(modify|return|new).*search|search.*(modify|return|new)/i.test(label)) continue;
+      if (await visible(control)) {
+        await control.click();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 async function portalLogin(page, config) {
   await page.goto(VPN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
   await delay(1000);
@@ -257,10 +279,7 @@ async function enterClassSearch(page) {
 async function prepareSearch(page, subject) {
   let frame = await findFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']");
   if (!frame) {
-    const modifySelector = "[id*='SSR_PB_MODIFY'], input[value='Modify Search'], a:has-text('Modify Search'), button:has-text('Modify Search')";
-    const resultsFrame = await findFrame(page, modifySelector);
-    const modify = resultsFrame ? await firstVisible(resultsFrame.locator(modifySelector)) : null;
-    if (modify && await visible(modify)) await modify.click();
+    if (!await clickSearchReset(page)) throw new Error("结果页未找到返回搜索按钮");
     frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']", 30000);
   }
 
