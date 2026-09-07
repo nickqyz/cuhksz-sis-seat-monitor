@@ -12,6 +12,10 @@ const STATE_FILE = path.join(DATA_DIR, "state.json");
 const LOG_FILE = path.join(DATA_DIR, "monitor.log");
 const VPN_URL = "https://vpn.cuhk.edu.cn/";
 const SIS_URL = "https://sis.cuhk.edu.cn/";
+const TARGETS = [
+  { id: "gea-l09-t23", subject: "GEA", course: "GEA 2000", sectionTokens: ["L09", "T23"] },
+  { id: "gfh-l04-t11", subject: "GFH", course: "GFH", sectionTokens: ["L04", "T11"] }
+];
 
 function cfg() {
   const defaultBrowser = process.platform === "win32"
@@ -246,7 +250,7 @@ async function enterClassSearch(page) {
   await waitForFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']", 45000);
 }
 
-async function prepareSearch(page) {
+async function prepareSearch(page, subject) {
   let frame = await findFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']");
   if (!frame) {
     const resultsFrame = await findFrame(page, "text=Modify Search");
@@ -262,7 +266,7 @@ async function prepareSearch(page) {
     frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']");
   }
 
-  await frame.locator("[id='SSR_CLSRCH_WRK_SUBJECT$0']").selectOption("GEA");
+  await frame.locator("[id='SSR_CLSRCH_WRK_SUBJECT$0']").selectOption(subject);
   await waitForPeopleSoftIdle(page);
   frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_ACAD_CAREER$2']");
   await frame.locator("[id='SSR_CLSRCH_WRK_ACAD_CAREER$2']").selectOption("UG");
@@ -278,7 +282,6 @@ async function prepareSearch(page) {
   const viewAll = frame.locator("[id='$ICField106$hviewall$0']");
   if (await visible(viewAll)) {
     await viewAll.click();
-    await frame.locator(".PSGRIDCOUNTER").filter({ hasText: /1-34 of 34/ }).waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
     await delay(1500);
     frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']");
   }
@@ -306,14 +309,47 @@ async function readSection(frame, token) {
   return { token, name: "", status: "Not found", total: null, capacity: null, seats: null, note: "", open: false };
 }
 
-async function check(page) {
-  const frame = await prepareSearch(page);
-  const sections = [await readSection(frame, "L09"), await readSection(frame, "T23")];
-  return { checkedAt: new Date().toISOString(), term: "2026-27 Term 1", course: "GEA 2000", sections, allOpen: sections.every(item => item.open) };
+async function checkTarget(page, target) {
+  const frame = await prepareSearch(page, target.subject);
+  const sections = [];
+  for (const token of target.sectionTokens) sections.push(await readSection(frame, token));
+  return { id: target.id, checkedAt: new Date().toISOString(), term: "2026-27 Term 1", course: target.course, sections, allOpen: sections.every(item => item.open) };
 }
 
 function describe(result) {
   return result.sections.map(item => `${item.name || item.token}: ${item.status}, ${item.total ?? "?"}/${item.capacity ?? "?"}, 剩余 ${item.seats ?? "?"}${item.note ? `（${item.note}）` : ""}`).join("；");
+}
+
+function previousOpen(state, target, index) {
+  const current = state.targets?.[target.id]?.allOpen;
+  if (typeof current === "boolean") return current;
+  if (index === 0 && typeof state.lastAllOpen === "boolean") return state.lastAllOpen;
+  return false;
+}
+
+async function processResults(config, state, results) {
+  let stateChanged = false;
+  for (let index = 0; index < results.length; index += 1) {
+    const target = TARGETS[index];
+    const result = results[index];
+    const wasOpen = previousOpen(state, target, index);
+    if (wasOpen !== result.allOpen) stateChanged = true;
+    log(`${target.course} ${result.allOpen ? "OPEN" : "CLOSED"} — ${describe(result)}`);
+    if (result.allOpen && !wasOpen && !config.dryRun) {
+      const content = `检测时间：${timestamp()}\n\n${describe(result)}\n\n请尽快自行登录 SIS 选课。本工具不会自动提交选课。`;
+      const provider = await notify(config, `SIS 有名额：${target.course} ${target.sectionTokens.join(" + ")}`, content);
+      log(`已通过 ${provider} 发送微信通知。`);
+    }
+  }
+  const targets = Object.fromEntries(results.map(result => [result.id, result]));
+  writeState({ ...state, lastAllOpen: results[0].allOpen, lastCheckAt: results.at(-1).checkedAt, lastResult: results[0], targets });
+  return stateChanged;
+}
+
+async function checkAll(page) {
+  const results = [];
+  for (const target of TARGETS) results.push(await checkTarget(page, target));
+  return results;
 }
 
 async function saveDebug(page, result) {
@@ -343,19 +379,13 @@ async function runMonitor(config) {
       await portalLogin(page, config);
       await openSis(page, config);
       await enterClassSearch(page);
-      log("Web VPN 与 SIS 登录成功，开始监控 GEA 2000 L09 + T23。");
+      log("Web VPN 与 SIS 登录成功，开始监控 GEA 2000 L09 + T23、GFH L04 + T11。");
 
       while (!stopping) {
-        const result = await check(page);
-        await saveDebug(page, result);
+        const results = await checkAll(page);
+        await saveDebug(page, results);
         const state = readState();
-        log(`${result.allOpen ? "OPEN" : "CLOSED"} — ${describe(result)}`);
-        if (result.allOpen && !state.lastAllOpen && !config.dryRun) {
-          const content = `检测时间：${timestamp()}\n\n${describe(result)}\n\n请尽快自行登录 SIS 选课。本工具不会自动提交选课。`;
-          const provider = await notify(config, "SIS 有名额：GEA 2000 L09 + T23", content);
-          log(`已通过 ${provider} 发送微信通知。`);
-        }
-        writeState({ ...state, lastAllOpen: result.allOpen, lastCheckAt: result.checkedAt, lastResult: result });
+        await processResults(config, state, results);
         await delay(config.intervalMs);
       }
     } catch (error) {
@@ -394,17 +424,10 @@ async function runOnce(config) {
     log(`云端阶段：SIS SSO 已处理（${await page.title().catch(() => "未知标题")}）`);
     await enterClassSearch(page);
     log("云端阶段：已进入 Class Search");
-    const result = await check(page);
-    await saveDebug(page, result);
+    const results = await checkAll(page);
+    await saveDebug(page, results);
     const state = readState();
-    const stateChanged = typeof state.lastAllOpen !== "boolean" || state.lastAllOpen !== result.allOpen;
-    log(`${result.allOpen ? "OPEN" : "CLOSED"} — ${describe(result)}`);
-    if (result.allOpen && !state.lastAllOpen && !config.dryRun) {
-      const content = `检测时间：${timestamp()}\n\n${describe(result)}\n\n请尽快自行登录 SIS 选课。本工具不会自动提交选课。`;
-      const provider = await notify(config, "SIS 有名额：GEA 2000 L09 + T23", content);
-      log(`已通过 ${provider} 发送微信通知。`);
-    }
-    writeState({ ...state, lastAllOpen: result.allOpen, lastCheckAt: result.checkedAt, lastResult: result });
+    const stateChanged = await processResults(config, state, results);
     setActionOutput("state_changed", stateChanged ? "true" : "false");
   } catch (error) {
     const page = context.pages()[0];
