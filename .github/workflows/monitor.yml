@@ -36,8 +36,7 @@ jobs:
         run: |
           printf '%s' "$VPN_PASSWORD" | sudo openconnect https://vpn.cuhk.edu.cn/ \
             --protocol=anyconnect \
-            --authgroup=CUHKSZ \
-            --usergroup=CUHKSZ \
+            --authgroup=CUHKSZ-offcampus \
             --user="$VPN_USERNAME" \
             --passwd-on-stdin \
             --background \
