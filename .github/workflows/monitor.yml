@@ -2,11 +2,12 @@ name: SIS seat monitor
 
 on:
   schedule:
-    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: sis-seat-monitor
@@ -51,3 +52,15 @@ jobs:
         with:
           path: .data/state.json
           key: sis-state-${{ github.run_id }}
+
+      - name: Wait before next check
+        if: always()
+        shell: pwsh
+        run: Start-Sleep -Seconds 120
+
+      - name: Queue next check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: gh workflow run monitor.yml --repo $env:GITHUB_REPOSITORY
