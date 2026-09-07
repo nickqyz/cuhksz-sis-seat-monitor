@@ -116,6 +116,13 @@ async function visible(locator, timeout = 800) {
   return locator.isVisible({ timeout }).catch(() => false);
 }
 
+async function firstVisible(locator) {
+  for (let i = 0; i < await locator.count(); i += 1) {
+    if (await visible(locator.nth(i))) return locator.nth(i);
+  }
+  return null;
+}
+
 async function findFrame(page, selector) {
   for (const frame of page.frames()) {
     if (await frame.locator(selector).count().catch(() => 0)) return frame;
@@ -158,12 +165,28 @@ async function openSis(page, config) {
     await delay(1500);
   }
 
-  if (await visible(page.locator("#userNameInput"))) {
-    await page.locator("#userNameInput").fill(config.username);
-    await page.locator("#nextButton").click();
-    await page.locator("#passwordInput").waitFor({ state: "visible", timeout: 10000 });
-    await page.locator("#passwordInput").fill(config.password);
-    await page.locator("#submitButton").click();
+  const adfsLogin = /\/adfs\//i.test(page.url()) || /登录|sign[ -]?in/i.test(await page.title().catch(() => ""));
+  if (adfsLogin) {
+    const username = await firstVisible(page.locator("#userNameInput, input[name*='user' i], input[type='email'], input[type='text']"));
+    if (!username) throw new Error("ADFS 登录页未找到账号输入框");
+    await username.fill(config.username);
+
+    let password = await firstVisible(page.locator("#passwordInput, input[name*='pass' i], input[type='password']"));
+    if (!password) {
+      const next = await firstVisible(page.locator("#nextButton, button[type='submit'], input[type='submit']"));
+      if (!next) throw new Error("ADFS 登录页未找到下一步按钮");
+      await next.click();
+      password = await firstVisible(page.locator("#passwordInput, input[name*='pass' i], input[type='password']"));
+      if (!password) {
+        await page.locator("#passwordInput, input[name*='pass' i], input[type='password']").first().waitFor({ state: "visible", timeout: 10000 });
+        password = await firstVisible(page.locator("#passwordInput, input[name*='pass' i], input[type='password']"));
+      }
+    }
+    if (!password) throw new Error("ADFS 登录页未找到密码输入框");
+    await password.fill(config.password);
+    const submit = await firstVisible(page.locator("#submitButton, button[type='submit'], input[type='submit']"));
+    if (!submit) throw new Error("ADFS 登录页未找到登录按钮");
+    await submit.click();
     await page.waitForLoadState("domcontentloaded", { timeout: 45000 }).catch(() => {});
     await delay(4000);
   }
