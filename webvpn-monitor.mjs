@@ -232,19 +232,6 @@ async function openSis(page, config) {
     await submit.click();
     await page.waitForLoadState("domcontentloaded", { timeout: 45000 }).catch(() => {});
     await delay(4000);
-
-    if (/\/adfs\//i.test(page.url())) {
-      const frameTexts = await Promise.all(page.frames().map(frame => frame.locator("body").innerText().catch(() => "")));
-      const body = frameTexts.join(" ").replace(/\s+/g, " ");
-      const classification = {
-        invalidCredentials: /incorrect|invalid (?:user|password)|用户名或密码.*(?:错误|不正确)|密码错误/i.test(body),
-        captchaRequired: /captcha|验证码|人机验证/i.test(body),
-        mfaRequired: /multi.factor|two.factor|authenticator|verification code|多重验证|双重验证|动态码/i.test(body),
-        accessDenied: /access denied|forbidden|not authorized|拒绝访问|无权访问/i.test(body),
-        loginFormStillVisible: Boolean(await firstVisibleAcrossFrames(page, "input[type='password']"))
-      };
-      log(`ADFS 返回分类：${JSON.stringify(classification)}`);
-    }
   }
 
   if (/errorCode=105/i.test(page.url())) throw new Error("SIS SSO 会话冲突（errorCode=105），稍后自动重试");
