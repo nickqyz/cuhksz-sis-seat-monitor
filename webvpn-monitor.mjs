@@ -228,6 +228,8 @@ async function clickViewAll(frame) {
 async function waitForSisLanding(page, config, timeout = 120000) {
   const started = Date.now();
   let signInClicks = 0;
+  let recoveryReloads = 0;
+  let lastRecoveryAt = started;
   while (Date.now() - started < timeout) {
     if (await findFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']")) return;
     const classSearch = page.locator("a").filter({ hasText: /^Class Search$/ }).last();
@@ -248,6 +250,23 @@ async function waitForSisLanding(page, config, timeout = 120000) {
         await signIn.click();
         signInClicks += 1;
         await delay(4000);
+        continue;
+      }
+
+      // PeopleSoft occasionally renders only the language links through Web VPN.
+      // Reloading the same proxied URL makes the native sign-in form appear again.
+      if (!nativeUser && !nativePassword && Date.now() - lastRecoveryAt >= 20000 && recoveryReloads < 3) {
+        recoveryReloads += 1;
+        lastRecoveryAt = Date.now();
+        log(`SIS Sign In 表单未加载，执行第 ${recoveryReloads} 次页面恢复。`);
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+        await delay(2500);
+        const english = await firstVisibleAcrossFrames(page, "a:has-text('English')");
+        if (english) {
+          await english.click().catch(() => {});
+          await page.waitForLoadState("domcontentloaded", { timeout: 45000 }).catch(() => {});
+          await delay(2500);
+        }
         continue;
       }
     }
