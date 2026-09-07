@@ -205,6 +205,23 @@ async function clickSearchReset(page) {
   return false;
 }
 
+async function clickViewAll(frame) {
+  const controls = frame.locator("a, input, button");
+  for (let index = 0; index < await controls.count(); index += 1) {
+    const control = controls.nth(index);
+    const label = [
+      await control.getAttribute("value").catch(() => ""),
+      await control.getAttribute("aria-label").catch(() => ""),
+      await control.getAttribute("title").catch(() => ""),
+      await control.innerText().catch(() => "")
+    ].filter(Boolean).join(" ");
+    if (!/view\s*all/i.test(label) || !await visible(control)) continue;
+    await control.click();
+    return true;
+  }
+  return false;
+}
+
 async function portalLogin(page, config) {
   await page.goto(VPN_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
   await delay(1000);
@@ -304,8 +321,8 @@ async function prepareSearch(page, subject) {
 
   frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']", 90000);
   const viewAll = frame.locator("[id='$ICField106$hviewall$0']");
-  if (await visible(viewAll)) {
-    await viewAll.click();
+  if (await visible(viewAll) || await clickViewAll(frame)) {
+    if (await visible(viewAll)) await viewAll.click();
     await delay(1500);
     frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']");
   }
