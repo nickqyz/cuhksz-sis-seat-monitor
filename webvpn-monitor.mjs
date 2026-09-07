@@ -264,7 +264,7 @@ async function prepareSearch(page) {
   await frame.locator("[id='CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH']").click();
   await delay(5000);
 
-  frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']", 30000);
+  frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']", 90000);
   const viewAll = frame.locator("[id='$ICField106$hviewall$0']");
   if (await visible(viewAll)) {
     await viewAll.click();
