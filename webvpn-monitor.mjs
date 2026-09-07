@@ -207,6 +207,7 @@ async function clickSearchReset(page) {
 
 async function clickViewAll(frame) {
   const controls = frame.locator("a, input, button");
+  const candidates = [];
   for (let index = 0; index < await controls.count(); index += 1) {
     const control = controls.nth(index);
     const label = [
@@ -216,10 +217,12 @@ async function clickViewAll(frame) {
       await control.innerText().catch(() => "")
     ].filter(Boolean).join(" ");
     if (!/view\s*all/i.test(label) || !await visible(control)) continue;
-    await control.click();
-    return true;
+    candidates.push({ control, id: await control.getAttribute("id").catch(() => ""), label });
   }
-  return false;
+  if (!candidates.length) return false;
+  log(`可见 View All 控件：${candidates.map(item => `${item.id || "(no id)"}=${item.label}`).join(" | ")}`);
+  await candidates.at(-1).control.click();
+  return true;
 }
 
 async function waitForSisLanding(page, timeout = 120000) {
