@@ -257,8 +257,9 @@ async function enterClassSearch(page) {
 async function prepareSearch(page, subject) {
   let frame = await findFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']");
   if (!frame) {
-    const resultsFrame = await findFrame(page, "text=Modify Search");
-    const modify = resultsFrame?.getByText("Modify Search", { exact: true }).first();
+    const modifySelector = "[id*='SSR_PB_MODIFY'], input[value='Modify Search'], a:has-text('Modify Search'), button:has-text('Modify Search')";
+    const resultsFrame = await findFrame(page, modifySelector);
+    const modify = resultsFrame ? await firstVisible(resultsFrame.locator(modifySelector)) : null;
     if (modify && await visible(modify)) await modify.click();
     frame = await waitForFrame(page, "[id='SSR_CLSRCH_WRK_SUBJECT$0']", 30000);
   }
