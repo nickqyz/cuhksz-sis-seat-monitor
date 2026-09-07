@@ -253,6 +253,18 @@ async function waitForSisLanding(page, config, timeout = 120000) {
     }
     await delay(1000);
   }
+  const controls = [];
+  for (const frame of page.frames()) {
+    const items = await frame.locator("input, button, a").evaluateAll(elements => elements.slice(0, 80).map(element => ({
+      tag: element.tagName,
+      id: element.id,
+      name: element.getAttribute("name"),
+      type: element.getAttribute("type"),
+      label: element.tagName === "INPUT" ? (element.getAttribute("type") === "submit" ? element.getAttribute("value") : null) : element.textContent?.trim().slice(0, 80)
+    })));
+    controls.push(...items);
+  }
+  log(`SIS Sign In 控件结构：${JSON.stringify(controls)}`);
   throw new Error("SIS 登录后未进入首页或 Class Search");
 }
 
