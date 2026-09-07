@@ -26,7 +26,8 @@ function cfg() {
     intervalMs: Math.max(60, Number(process.env.CHECK_INTERVAL_SECONDS || 120)) * 1000,
     browserPath: process.env.BROWSER_PATH || process.env.EDGE_PATH || defaultBrowser,
     headless: !/^(0|false|no)$/i.test(process.env.HEADLESS || "true"),
-    dryRun: /^(1|true|yes)$/i.test(process.env.DRY_RUN || "false")
+    dryRun: /^(1|true|yes)$/i.test(process.env.DRY_RUN || "false"),
+    directSis: /^(1|true|yes)$/i.test(process.env.USE_DIRECT_SIS || "false")
   };
 }
 
@@ -161,8 +162,12 @@ async function portalLogin(page, config) {
 }
 
 async function openSis(page, config) {
-  await page.locator("#unicorn_form_url").fill(SIS_URL);
-  await page.locator("#unicorn_form_url").press("Enter");
+  if (config.directSis) {
+    await page.goto(SIS_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+  } else {
+    await page.locator("#unicorn_form_url").fill(SIS_URL);
+    await page.locator("#unicorn_form_url").press("Enter");
+  }
   await page.waitForLoadState("domcontentloaded", { timeout: 45000 }).catch(() => {});
   await delay(2500);
 
@@ -346,8 +351,12 @@ async function runOnce(config) {
   });
   try {
     const page = context.pages()[0] || await context.newPage();
-    await portalLogin(page, config);
-    log(`云端阶段：Web VPN 已登录（${await page.title().catch(() => "未知标题")}）`);
+    if (!config.directSis) {
+      await portalLogin(page, config);
+      log(`云端阶段：Web VPN 已登录（${await page.title().catch(() => "未知标题")}）`);
+    } else {
+      log("云端阶段：已使用系统级校园 VPN");
+    }
     await openSis(page, config);
     log(`云端阶段：SIS SSO 已处理（${await page.title().catch(() => "未知标题")}）`);
     await enterClassSearch(page);

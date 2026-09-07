@@ -26,6 +26,22 @@ jobs:
 
       - run: npm ci
 
+      - name: Install campus VPN client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq openconnect
+
+      - name: Connect to CUHK VPN
+        env:
+          VPN_USERNAME: ${{ secrets.SIS_USERNAME }}
+          VPN_PASSWORD: ${{ secrets.SIS_PASSWORD }}
+        run: |
+          printf '%s' "$VPN_PASSWORD" | sudo openconnect https://vpn.cuhk.edu.cn/ \
+            --protocol=anyconnect \
+            --authgroup=CUHKSZ \
+            --user="$VPN_USERNAME" \
+            --passwd-on-stdin \
+            --background \
+            --pid-file=/tmp/cuhk-openconnect.pid
+
       - name: Restore notification state
         id: restore-state
         uses: actions/cache/restore@v4
@@ -43,6 +59,7 @@ jobs:
           WXPUSHER_SPT: ${{ secrets.WXPUSHER_SPT }}
           BROWSER_PATH: /usr/bin/google-chrome
           HEADLESS: "true"
+          USE_DIRECT_SIS: "true"
         run: node webvpn-monitor.mjs once
 
       - name: Save changed notification state
@@ -51,3 +68,10 @@ jobs:
         with:
           path: .data/state.json
           key: sis-state-${{ github.run_id }}
+
+      - name: Disconnect campus VPN
+        if: always()
+        run: |
+          if [ -f /tmp/cuhk-openconnect.pid ]; then
+            sudo kill "$(cat /tmp/cuhk-openconnect.pid)" || true
+          fi
