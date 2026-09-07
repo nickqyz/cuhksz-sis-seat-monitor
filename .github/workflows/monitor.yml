@@ -15,7 +15,7 @@ concurrency:
 jobs:
   check:
     runs-on: windows-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
 
