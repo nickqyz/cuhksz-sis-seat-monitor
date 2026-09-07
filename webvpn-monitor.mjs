@@ -346,8 +346,14 @@ async function prepareSearch(page, subject) {
 
   frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']", 90000);
   const viewAll = frame.locator("[id='$ICField106$hviewall$0']");
-  if (await visible(viewAll) || await clickViewAll(frame)) {
-    if (await visible(viewAll)) await viewAll.click();
+  let expanded = false;
+  if (await visible(viewAll)) {
+    await viewAll.click();
+    expanded = true;
+  } else {
+    expanded = await clickViewAll(frame);
+  }
+  if (expanded) {
     await delay(1500);
     frame = await waitForFrame(page, "[id^='DERIVED_CLSRCH_SSR_CLASSNAME_LONG$']");
   }
