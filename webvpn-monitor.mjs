@@ -225,7 +225,7 @@ async function clickViewAll(frame) {
   return true;
 }
 
-async function waitForSisLanding(page, timeout = 120000) {
+async function waitForSisLanding(page, config, timeout = 120000) {
   const started = Date.now();
   let signInClicks = 0;
   while (Date.now() - started < timeout) {
@@ -234,9 +234,17 @@ async function waitForSisLanding(page, timeout = 120000) {
     if (await visible(classSearch, 300)) return;
     const marker = `${page.url()} ${await page.title().catch(() => "")}`;
     if (/errorCode=105|\bsign in\b/i.test(marker)) {
+      const nativeUser = await firstVisibleAcrossFrames(page, "#userid, input[name='userid'], input[name*='user' i], input[type='text']");
+      const nativePassword = await firstVisibleAcrossFrames(page, "#pwd, input[name='pwd'], input[name*='pass' i], input[type='password']");
       const signIn = await firstVisibleAcrossFrames(page, "input[value='Sign In'], button:has-text('Sign In'), a:has-text('Sign In'), input[type='submit'], button[type='submit']");
       if (signIn && signInClicks < 2) {
-        log("检测到 PeopleSoft Sign In 页面，自动继续登录。");
+        if (nativeUser && nativePassword) {
+          await nativeUser.fill(config.username);
+          await nativePassword.fill(config.password);
+          log("检测到 PeopleSoft 登录表单，已填写凭据并继续登录。");
+        } else {
+          log("检测到 PeopleSoft Sign In 页面，自动继续登录。");
+        }
         await signIn.click();
         signInClicks += 1;
         await delay(4000);
@@ -307,7 +315,7 @@ async function openSis(page, config) {
     await delay(4000);
   }
 
-  await waitForSisLanding(page);
+  await waitForSisLanding(page, config);
   if (await visible(english)) throw new Error("SIS 登录未完成");
 }
 
