@@ -234,8 +234,9 @@ async function waitForSisLanding(page, timeout = 120000) {
     if (await visible(classSearch, 300)) return;
     const marker = `${page.url()} ${await page.title().catch(() => "")}`;
     if (/errorCode=105|\bsign in\b/i.test(marker)) {
-      const signIn = await firstVisibleAcrossFrames(page, "input[value='Sign In'], button:has-text('Sign In'), a:has-text('Sign In')");
+      const signIn = await firstVisibleAcrossFrames(page, "input[value='Sign In'], button:has-text('Sign In'), a:has-text('Sign In'), input[type='submit'], button[type='submit']");
       if (signIn && signInClicks < 2) {
+        log("检测到 PeopleSoft Sign In 页面，自动继续登录。");
         await signIn.click();
         signInClicks += 1;
         await delay(4000);
